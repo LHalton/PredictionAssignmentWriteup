@@ -1,0 +1,100 @@
+---
+title: "Prediction Assignment Writeup"
+author: "LHalton"
+date: "February 25, 2016"
+output: html_document
+---
+
+##Background  
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).  
+
+##Data  
+
+Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project comes from this source: http://groupware.les.inf.puc-rio.br/har. 
+
+##Analysis
+
+1) We will begin the analysis by downloading the data from the website http://groupware.les.inf.puc-rio.br/har.  
+
+```{r, echo=TRUE}
+TrainingURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"  
+
+TestingURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+TrainingData <- read.csv(url(TrainingURL), na.strings=c("NA","DIV/0!",""))
+
+TestingData <- read.csv(url(TestingURL), na.strings=c("NA","DIV/0!",""))  
+```  
+
+2) We will clean the data after loading the data set by deleting columns with missing values and deleting variables that we will not be using for analysis:  
+```{r, echo=TRUE}
+TrainingData <- TrainingData [,colSums(is.na(TrainingData)) == 0]
+TestingData <- TestingData [,colSums(is.na(TestingData)) == 0]  
+
+TrainingData <- TrainingData[,-c(1:7)]
+TestingData <- TestingData[,-c(1:7)]
+```  
+
+3) We will partition the data into 2 sets for training and testing:  
+```{r, echo=TRUE}  
+library(caret)
+inTrain <- createDataPartition(y=TrainingData$classe, p=0.6, list=FALSE)
+myTraining <- TrainingData[inTrain, ]; myTesting <- TrainingData[-inTrain, ]
+dim(myTraining); dim(myTesting) 
+```  
+
+4) Review the "classe" variable frequency:
+```{r, echo=TRUE}
+plot(myTraining$classe, col="darkturquoise", main="Frequency of the Classe Levels within the Training Subset", xlab="Classe Levels", ylab="Frequency")
+```  
+
+5) Correlation:  
+```{r, echo=TRUE}
+Hcorr <- caret::findCorrelation(cor(myTraining[, -53]), cutoff=0.8)
+names(myTraining)[Hcorr]
+```  
+
+6) Decision Tree:
+```{r, echo=TRUE}
+library(rpart.plot)
+Model1 <- rpart(classe ~ ., data=myTraining, method="class")
+Prediction1 <- predict(Model1, myTesting, type = "class")
+rpart.plot(Model1, main="Decision Tree", extra=102, under=TRUE, faclen=0)
+confusionMatrix(Prediction1, myTesting$classe)
+```
+
+7) Random Forest: 
+```{r, echo=TRUE}
+library(randomForest)
+Model2 <- randomForest(classe ~. , data=myTraining, method="class")
+Prediction2 <- predict(Model2, myTesting, type = "class")
+confusionMatrix(Prediction2, myTesting$classe)
+``` 
+
+##Conclusion  
+
+It can be noted that the Random Forest analysis is the better predictor for this data set because the accuracy is 0.9934 with a confidence interval of (0.9913, 0.9950) compared to the decision tree analysis that yielded accuracy of 0.7573 with a confidence interval of (0.7477, 0.7668).  
+
+## Answer Submission Files  
+
+```{r, echo=TRUE}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(Prediction2)
